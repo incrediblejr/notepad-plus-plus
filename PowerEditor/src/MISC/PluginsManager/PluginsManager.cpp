@@ -314,57 +314,35 @@ bool PluginsManager::loadPluginsV2(const TCHAR* dir)
 	
 	WIN32_FIND_DATA foundData;
 	HANDLE hFindFolder = ::FindFirstFile(pluginsFolderFilter.c_str(), &foundData);
-	HANDLE hFindDll = INVALID_HANDLE_VALUE;
-
+	
 	// get plugin folder
-	if (hFindFolder != INVALID_HANDLE_VALUE && (foundData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
-	{
-		generic_string pluginsFullPathFilter = pluginsFolder;
-		PathAppend(pluginsFullPathFilter, foundData.cFileName);
-		generic_string pluginsFolderPath = pluginsFullPathFilter;
-		generic_string  dllName = foundData.cFileName;
-		dllName += TEXT(".dll");
-		PathAppend(pluginsFullPathFilter, dllName);
+	if (hFindFolder == INVALID_HANDLE_VALUE)
+		return true;
 
-		// get plugin
-		hFindDll = ::FindFirstFile(pluginsFullPathFilter.c_str(), &foundData);
-		if (hFindDll != INVALID_HANDLE_VALUE && !(foundData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
-		{
-			dllNames.push_back(pluginsFullPathFilter);
+	do {
+		// ignore subdirectories starting with '.', e.g. "." and ".."
+		if (foundData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY && foundData.cFileName[0] != '.') {
+			generic_string pluginsFullPathFilter = pluginsFolder;
+			PathAppend(pluginsFullPathFilter, foundData.cFileName);
+			generic_string  dllName = foundData.cFileName;
+			dllName += TEXT(".dll");
+			PathAppend(pluginsFullPathFilter, dllName);
 
-			PluginList & pl = nppParams->getPluginList();
-			pl.add(foundData.cFileName, false);
-		}
-
-		// get plugin folder
-		while (::FindNextFile(hFindFolder, &foundData))
-		{
-			generic_string pluginsFullPathFilter2 = pluginsFolder;
-			PathAppend(pluginsFullPathFilter2, foundData.cFileName);
-			generic_string pluginsFolderPath2 = pluginsFullPathFilter2;
-			generic_string  dllName2 = foundData.cFileName;
-			dllName2 += TEXT(".dll");
-			PathAppend(pluginsFullPathFilter2, dllName2);
-
-			// get plugin
-			if (hFindDll)
-			{
-				::FindClose(hFindDll);
-				hFindDll = INVALID_HANDLE_VALUE;
-			}
-			hFindDll = ::FindFirstFile(pluginsFullPathFilter2.c_str(), &foundData);
+			// get plugin ($pluginsFolder$/FOLDER_NAME/FOLDER_NAME.dll)
+			HANDLE hFindDll = ::FindFirstFile(pluginsFullPathFilter.c_str(), &foundData);
 			if (hFindDll != INVALID_HANDLE_VALUE && !(foundData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
 			{
-				dllNames.push_back(pluginsFullPathFilter2);
+				dllNames.push_back(pluginsFullPathFilter);
 
 				PluginList & pl = nppParams->getPluginList();
 				pl.add(foundData.cFileName, false);
 			}
-		}
 
-	}
+			::FindClose(hFindDll);
+		}
+	} while (::FindNextFile(hFindFolder, &foundData));
+	
 	::FindClose(hFindFolder);
-	::FindClose(hFindDll);
 
 	for (size_t i = 0, len = dllNames.size(); i < len; ++i)
 	{
